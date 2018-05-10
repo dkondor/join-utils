@@ -345,7 +345,7 @@ generated on-the-fly and the size can be indefinite or very large.
 				// read one line from file 2, process it
 				string[] line2 = ReadLine(s2,sep,empty,req_fields2);
 				if(line2 == null) break;
-				string key = line2[field2];
+				string key = line2[field2-1];
 				if(dict.ContainsKey(key)) {
 					File1Line match = dict[key];
 					if(!only_unpaired) {
