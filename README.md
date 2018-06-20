@@ -20,3 +20,15 @@ All programs have a short description in the source and display usage instructio
 the original 'join' command, where possible.
 
 
+## how to compile a stand-alone executable for Linux
+
+Mono's mkbundle command can be used to create an ''stand-alone'' binary that can be run without relying on the Mono / .NET runtime. To convert the
+.exe to such native Linux binary, use the following:
+
+mkbundle --i18n none --static -o numeric_join numeric_join.exe /usr/lib/mono/4.5/mscorlib.dll
+
+The result will likely be quite large (~5-10 MB), as this embeds part of the Mono runtime and libraries together with the compiled code. This can be
+moved to another Linux machine without Mono installed and run. Note that this actually does not produce a statically linked binary: the result will still
+use basic dynamic libraries on the system, mainly libc, libm and such. Thus, these need to be compatible.
+
+
