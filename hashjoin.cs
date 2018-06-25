@@ -11,6 +11,8 @@
  * is too large to be sorted or even generated other than in a streaming
  * fashion, while the other file fits comfortably in memory
  * 
+ * Copyright 2018 Daniel Kondor <kondor.dani@gmail.com>
+ * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:

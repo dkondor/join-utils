@@ -207,7 +207,7 @@ Example usage:
 					int joinfield = 1;
 					if(i+2 < args.Length && args[i+2][0] != '-') {
 						i += 2;
-						if(!Int32.TryParse(args[i+2],out joinfield)) {
+						if(!Int32.TryParse(args[i],out joinfield)) {
 							Console.Error.WriteLine("Invalid parameter: {0} {1} {2}",args[i-2],args[i-1],args[i]);
 							break;
 						}
@@ -287,6 +287,7 @@ Example usage:
 				firstline = true;
 				while(true) {
 					string[] l1 = ReadLine(s,sep,empty,req_fields);
+					if(l1 == null) break; // end of file
 					if(check_fieldnum) {
 						if(firstline) { req_fields = l1.Length; firstline = false; }
 						else if(req_fields != l1.Length) {
@@ -294,7 +295,6 @@ Example usage:
 							return;
 						}
 					}
-					if(l1 == null) break; // end of file
 					string key = l1[field1-1]; // note: we already checked that l1 has at least field1 fields in ReadLine()
 					if(d.ContainsKey(key)) {
 						if(unique) { Console.Error.WriteLine("Duplicate key in file 1 ({0}): {1} on line {2}!\n",s.Fn,key,s.Line); return; }
