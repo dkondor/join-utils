@@ -8,6 +8,8 @@
  * main motivation is to be able to join a text file with several other sources
  * in one pass and without sorting
  * 
+ * Copyright 2018 Daniel Kondor <kondor.dani@gmail.com>
+ * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
