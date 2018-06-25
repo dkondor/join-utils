@@ -9,6 +9,8 @@
  * impractical if the files are very large and are already sorted by
  * numeric order
  * 
+ * Copyright 2018 Daniel Kondor <kondor.dani@gmail.com>
+ * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
  * met:
@@ -376,6 +378,8 @@ Important: FILE1 and FILE2 must be sorted on the join fields.
 			UInt64 unmatched = 0;
 			while(true) {
 				if(lines1.Count == 0 && lines2.Count == 0) break; // end of both files
+				if(lines1.Count == 0 && unpaired != 2) break;
+				if(lines2.Count == 0 && unpaired != 1) break;
 				if(lines1.Count > 0 && lines2.Count > 0 && id1 == id2) {
 					// match, write out (if needed -- not only_unpaired)
 					// there could be several lines from both files, iterate
@@ -420,55 +424,8 @@ Important: FILE1 and FILE2 must be sorted on the join fields.
 				} // write out one match
 				
 				// no match
-				if(lines1.Count == 0) {
-					// end of file1
-					if(unpaired == 2) {
-						foreach(string[] line2 in lines2) {
-							// still print unpaired lines from file 2
-							bool firstout = true;
-							// note: we write empty fields for file 1
-							if(outfields1 != null) WriteFields(sw,null,outfields1,ref firstout,out_sep);
-							WriteFields(sw,line2,outfields2,ref firstout,out_sep);
-							sw.Write('\n');
-							out_lines++;
-							unmatched++;
-						}
-						ReadNext(s2,lines2,ref id2,ref nextid2,ref next2,field2,req_fields2,sep,empty);
-						continue;
-					}
-					else break;
-				}
-				if(lines2.Count == 0) {
-					// end of file2
-					if(unpaired == 1) {
-						foreach(string[] line1 in lines1) {
-							// still print unpaired lines from file 1
-							bool firstout = true;
-							WriteFields(sw,line1,outfields1,ref firstout,out_sep);
-							// note: we write empty fields for file 2
-							if(outfields2 != null) WriteFields(sw,null,outfields2,ref firstout,out_sep);
-							sw.Write('\n');
-							out_lines++;
-							unmatched++;
-						}
-						ReadNext(s1,lines1,ref id1,ref nextid1,ref next1,field1,req_fields1,sep,empty);
-						continue;
-					}
-					else break;
-				}
-				
-				// both files have data, but unpaired
-				if(id1 < id2) {
+				if(lines1.Count > 0 && (id1 < id2 || lines2.Count == 0) ) {
 					// need to advance file1
-					
-					// first check sort order, that could be a problem here
-					if(next1 != null && nextid1 < id1) {
-						string err = "Error: input file " + s1.Fn +
-							" not sorted on line " + s1.Line + " ( " +
-							nextid1.ToString() + " < " + id1.ToString() + ")!\n";
-						Console.Error.WriteLine("{0}",err);
-						break;
-					}
 					
 					// check if lines from file 1 should be output if not matched
 					if(unpaired == 1) foreach(string[] line1 in lines1) {
@@ -482,33 +439,42 @@ Important: FILE1 and FILE2 must be sorted on the join fields.
 						unmatched++;
 					}
 					
+					// first check sort order, that could be a problem here
+					if(next1 != null && nextid1 < id1) {
+						string err = "Error: input file " + s1.Fn +
+							" not sorted on line " + s1.Line + " ( " +
+							nextid1.ToString() + " < " + id1.ToString() + ")!\n";
+						Console.Error.WriteLine("{0}",err);
+						break;
+					}
+					
 					ReadNext(s1,lines1,ref id1,ref nextid1,ref next1,field1,req_fields1,sep,empty);
-					continue;
 				}
-				
-				// here id2 < id1
-				// first check sort order, that could be a problem here
-				if(next2 != null && nextid2 < id2) {
-					string err = "Error: input file " + s2.Fn +
-						" not sorted on line " + s2.Line + " ( " +
-						nextid2.ToString() + " < " + id2.ToString() + ")!\n";
-					Console.Error.WriteLine("{0}",err);
-					break;
+				else {
+					// here id2 < id1 or lines1.Count == 0 and lines2.Count > 0
+					// check if lines from file 2 should be output if not matched
+					if(unpaired == 2) foreach(string[] line2 in lines2) {
+						// still print unpaired lines from file 2
+						bool firstout = true;
+						// note: we write empty fields for file 1
+						if(outfields1 != null) WriteFields(sw,null,outfields1,ref firstout,out_sep);
+						WriteFields(sw,line2,outfields2,ref firstout,out_sep);
+						sw.Write('\n');
+						out_lines++;
+						unmatched++;
+					}
+					
+					// first check sort order, that could be a problem here
+					if(next2 != null && nextid2 < id2) {
+						string err = "Error: input file " + s2.Fn +
+							" not sorted on line " + s2.Line + " ( " +
+							nextid2.ToString() + " < " + id2.ToString() + ")!\n";
+						Console.Error.WriteLine("{0}",err);
+						break;
+					}
+					
+					ReadNext(s2,lines2,ref id2,ref nextid2,ref next2,field2,req_fields2,sep,empty);
 				}
-				
-				// check if lines from file 2 should be output if not matched
-				if(unpaired == 2) foreach(string[] line2 in lines2) {
-					// still print unpaired lines from file 2
-					bool firstout = true;
-					// note: we write empty fields for file 1
-					if(outfields1 != null) WriteFields(sw,null,outfields1,ref firstout,out_sep);
-					WriteFields(sw,line2,outfields2,ref firstout,out_sep);
-					sw.Write('\n');
-					out_lines++;
-					unmatched++;
-				}
-				
-				ReadNext(s2,lines2,ref id2,ref nextid2,ref next2,field2,req_fields2,sep,empty);
 				
 			} // main loop
 			
