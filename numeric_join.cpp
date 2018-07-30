@@ -274,6 +274,7 @@ int main(int argc, char** args) {
 					int x;
 					while(lp.read(x)) { tmp.push_back(x); if(x > max) max = x; if(x < 1) { valid = false; break; } }
 					if(lp.get_last_error() != T_EOL || tmp.empty()) valid = false;
+					i++;
 				}
 				if(!valid) { std::cerr<<"Invalid parameter: "<<args[i]<<" "<<args[i+1]<<"\n  use numjoin -h for help\n"; return 1; }
 				if(args[i][2] == '1') {
@@ -285,7 +286,6 @@ int main(int argc, char** args) {
 					if(max > req_fields2) req_fields2 = max;
 				}
 			}
-			i++;
 			break;
 		case 'H':
 			header = true;
