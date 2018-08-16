@@ -355,7 +355,7 @@ Example usage:
 				string[] line2 = ReadLine(s2,sep,empty,req_fields0);
 				if(line2 == null) break;
 				if(check_fieldnum) {
-					if(firstline) { req_fields0 = line2.Length; firstline = false; }
+					if(firstline) { req_fields0 = line2.Length; firstline = false; matched = new Tuple<int,string[]>[req_fields0]; }
 					else if(req_fields0 != line2.Length) {
 						Console.Error.WriteLine("Inconsistent number of fields in file {0} at line {1}!",s2.Fn,s2.Line);
 						return;
