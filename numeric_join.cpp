@@ -208,8 +208,8 @@ int main(int argc, char** args) {
 	int req_fields1 = 1;
 	int req_fields2 = 1;
 	
-	std::vector<int> outfields1;
-	std::vector<int> outfields2;
+	std::vector<int> outfields1; bool outfields1_empty = false;
+	std::vector<int> outfields2; bool outfields2_empty = false;
 	
 	char delim = 0;
 	char comment = 0;
@@ -264,27 +264,31 @@ int main(int argc, char** args) {
 			{
 				std::vector<int> tmp;
 				bool valid = true;
+				bool empty = true;
 				int max = 0;
 				// it is valid to give zero output columns from one of the files
 				// (e.g. to filter the other file)
 				// this case it might be necessary to give an empty string
 				// as the argument (i.e. -o1 "")
-				if( !(args[i+1][0] == 0 || args[i+1][0] == '-') ) {
+				if( !(args[i+1] == 0 || args[i+1][0] == 0 || args[i+1][0] == '-') ) {
 					line_parser lp(line_parser_params().set_delim(','),args[i+1]);
 					int x;
 					while(lp.read(x)) { tmp.push_back(x); if(x > max) max = x; if(x < 1) { valid = false; break; } }
 					if(lp.get_last_error() != T_EOL || tmp.empty()) valid = false;
-					i++;
+					empty = false;
 				}
 				if(!valid) { std::cerr<<"Invalid parameter: "<<args[i]<<" "<<args[i+1]<<"\n  use numjoin -h for help\n"; return 1; }
 				if(args[i][2] == '1') {
 					outfields1 = std::move(tmp);
 					if(max > req_fields1) req_fields1 = max;
+					outfields1_empty = empty;
 				}
 				if(args[i][2] == '2') {
 					outfields2 = std::move(tmp);
 					if(max > req_fields2) req_fields2 = max;
+					outfields2_empty = empty;
 				}
+				if(!(args[i+1] == 0 || args[i+1][0] == '-')) i++;
 			}
 			break;
 		case 'H':
@@ -343,8 +347,8 @@ int main(int argc, char** args) {
 		
 			
 		bool firstout = true;
-		WriteFields(sw,line1_fields,outfields1,firstout,out_sep);
-		WriteFields(sw,line2_fields,outfields2,firstout,out_sep);
+		if(!outfields1_empty) WriteFields(sw,line1_fields,outfields1,firstout,out_sep);
+		if(!outfields2_empty) WriteFields(sw,line2_fields,outfields2,firstout,out_sep);
 		
 	}
 	
@@ -379,8 +383,8 @@ int main(int argc, char** args) {
 				for(size_t k=0;k<lines2.size();k++) {
 					// write out fields from the first file
 					bool firstout = true;
-					WriteFields(sw,lines1[j].fields,outfields1,firstout,out_sep);
-					WriteFields(sw,lines2[k].fields,outfields2,firstout,out_sep);
+					if(!outfields1_empty) WriteFields(sw,lines1[j].fields,outfields1,firstout,out_sep);
+					if(!outfields2_empty) WriteFields(sw,lines2[k].fields,outfields2,firstout,out_sep);
 					sw<<'\n';
 					out_lines++;
 				}
@@ -424,7 +428,7 @@ int main(int argc, char** args) {
 			if(unpaired == 1) for(size_t j=0;j<lines1.size();j++) {
 				// still print unpaired lines from file 1
 				bool firstout = true;
-				WriteFields(sw,lines1[j].fields,outfields1,firstout,out_sep);
+				if(!outfields1_empty) WriteFields(sw,lines1[j].fields,outfields1,firstout,out_sep);
 				// note: we write empty fields for file 2
 				if(!outfields2.empty()) WriteFields(sw,std::vector<string_view_custom>(),outfields2,firstout,out_sep);
 				sw<<'\n';
@@ -454,7 +458,7 @@ int main(int argc, char** args) {
 				bool firstout = true;
 				// note: we write empty fields for file 1
 				if(!outfields1.empty()) WriteFields(sw,std::vector<string_view_custom>(),outfields1,firstout,out_sep);
-				WriteFields(sw,lines2[j].fields,outfields2,firstout,out_sep);
+				if(!outfields2_empty) WriteFields(sw,lines2[j].fields,outfields2,firstout,out_sep);
 				sw<<'\n';
 				out_lines++;
 				unmatched++;
