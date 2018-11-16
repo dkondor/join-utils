@@ -129,7 +129,7 @@ struct read_table_skip_t { };
 static const read_table_skip_t _read_table_skip1;
 static const read_table_skip_t& read_table_skip() { return _read_table_skip1; }
 /* helper class to return read-only string parts
- * (if std::string_view is not available) */
+ * (if std::string_view is not available) 
 struct string_view_custom {
 	const char* str;
 	size_t len;
@@ -144,17 +144,17 @@ struct string_view_custom {
 	}
 	string_view_custom():str(0),len(0) { }
 	bool operator == (const string_view_custom& v) const {
-		if(len != v.len) return false; /* lengths must be the same */
-		if(len == 0) return true; /* empty strings are considered equal */
+		if(len != v.len) return false; /* lengths must be the same 
+		if(len == 0) return true; /* empty strings are considered equal 
 		if(str && v.str) return strncmp(str,v.str,len) == 0;
-		else return false; /* str or v.str is null, this is probably an error */
+		else return false; /* str or v.str is null, this is probably an error 
 	}
 };
 template<class ostream>
 ostream& operator << (ostream& s, const string_view_custom& str) {
 	s.write(str.str,str.len);
 	return s;
-}
+}*/
 
 /* struct to represent values with bounds */
 template<class T>
@@ -225,7 +225,9 @@ struct line_parser {
 		explicit line_parser(Args&&... args):buf(std::forward<Args>(args)...) {
 			line_parser_init(line_parser_params());
 		}
-		
+		/* disallow copying */
+		line_parser(const line_parser& lp) = delete;
+		line_parser(line_parser&& lp) noexcept = default;
 		/* move constructor and move assignment -- ensure the string is moved
 		line_parser(line_parser&& lp) {
 			buf = std::move(lp.buf);
@@ -331,7 +333,7 @@ struct line_parser {
 		/* read one 16-bit unsigned integer in the given limits */
 		bool read_uint16_limits(uint16_t& i, uint16_t min, uint16_t max, bool advance_pos = true);
 		bool read_uint16(uint16_t& i, bool advance_pos = true) { return read_uint16_limits(i,0,UINT16_MAX,advance_pos); }
-		/* read one double value in the given limits */
+		/* read one double value in the given li/vector/mits */
 		bool read_double_limits(double& d, double min, double max, bool advance_pos = true);
 		bool read_double(double& d, bool advance_pos = true);
 		/* read string, copying from the buffer */
@@ -340,7 +342,8 @@ struct line_parser {
 #if __cplusplus >= 201703L
 		bool read_string_view(std::string_view& str, bool advance_pos = true);
 #endif
-		bool read_string_view_custom(string_view_custom& str, bool advance_pos = true);
+/*		bool read_string_view_custom(string_view_custom& str, bool advance_pos = true); */
+		bool read_string_view_pair(std::pair<size_t,size_t>& str, bool advance_pos = true);
 	
 	protected:
 		/* helper functions for the previous */
@@ -638,12 +641,15 @@ bool line_parser::read_string_view(std::string_view& str, bool advance_pos) {
 #endif
 /* same but using a custom class instead of relying on the C++17
  * std::string_view */
-bool line_parser::read_string_view_custom(string_view_custom& str, bool advance_pos) {
+/* bool line_parser::read_string_view_custom(string_view_custom& str, bool advance_pos) {
 	std::pair<size_t,size_t> pos1;
 	if(!read_string2(pos1,advance_pos)) return false;
 	str.str = buf.data() + pos1.first;
 	str.len = pos1.second;
 	return true;
+}*/
+bool line_parser::read_string_view_pair(std::pair<size_t,size_t>& str, bool advance_pos) {
+	return read_string2(str,advance_pos);
 }
 
 /* return the string value in the next field as a copy */
@@ -903,7 +909,7 @@ template<> bool line_parser::read_next(std::string& str, bool advance_pos) { ret
 #if __cplusplus >= 201703L
 template<> bool line_parser::read_next(std::string_view& str, bool advance_pos) { return read_string_view(str,advance_pos); }
 #endif
-template<> bool line_parser::read_next(string_view_custom& str, bool advance_pos) { return read_string_view_custom(str,advance_pos); }
+/* template<> bool line_parser::read_next(string_view_custom& str, bool advance_pos) { return read_string_view_custom(str,advance_pos); } */
 
 /* dummy struct to be able to call the same interface to skip data
  * (useful if used with the variadic template below) */

@@ -107,6 +107,35 @@ uint64_t MurmurHash64A ( const char * key, size_t len, uint64_t seed )
 	return h;
 }
 
+/* helper class to store read-only string parts
+ * (if std::string_view is not available) */
+struct string_view_custom {
+	const char* str;
+	size_t len;
+	const char* data() const { return str; }
+	size_t length() const { return len; }
+	size_t size() const { return len; }
+	char operator [] (size_t i) const { return str[i]; }
+	int print(FILE* f) const {
+		if(len == 0) return 0;
+		if(len <= INT32_MAX) return fprintf(f,"%.*s",(int)len,str);
+		return -1;
+	}
+	string_view_custom():str(0),len(0) { }
+	string_view_custom(const char* s, size_t l):str(s),len(l) { }
+	bool operator == (const string_view_custom& v) const {
+		if(len != v.len) return false; /* lengths must be the same */
+		if(len == 0) return true; /* empty strings are considered equal */
+		if(str && v.str) return strncmp(str,v.str,len) == 0;
+		else return false; /* str or v.str is null, this is probably an error */
+	}
+};
+template<class ostream>
+ostream& operator << (ostream& s, const string_view_custom& str) {
+	s.write(str.str,str.len);
+	return s;
+}
+
 struct string_view_custom_hash {
 	uint64_t seed;
 	string_view_custom_hash():seed(0xe6573480bcc4fceaUL) {  }
@@ -190,11 +219,16 @@ generated on-the-fly and the size can be indefinite or very large.
  */
 bool ParseLine(line_parser& sr, std::vector<string_view_custom>& res) {
 	if(res.empty()) while(true) {
-		string_view_custom s;
-		if(!sr.read_string_view_custom(s)) return sr.get_last_error() == T_EOL;
-		res.push_back(s);
+		std::pair<size_t,size_t> x;
+		if(!sr.read_string_view_pair(x)) return sr.get_last_error() == T_EOL;
+		res.emplace_back(sr.get_line_c_str() + x.first, x.second);
 	}
-	else for(string_view_custom& s : res) if(!sr.read_string_view_custom(s)) return false;
+	else for(string_view_custom& s : res) {
+		std::pair<size_t,size_t> x;
+		if(!sr.read_string_view_pair(x)) return false;
+		s.str = sr.get_line_c_str() + x.first;
+		s.len = x.second;
+	}
 	return true;
 }
 bool ReadLine(read_table2& sr, size_t field, std::pair<char*,std::vector<string_view_custom> >& res) {
@@ -252,8 +286,8 @@ int main(int argc, char** args) {
 	int req_fields1 = 1;
 	int req_fields2 = 1;
 	
-	std::vector<int> outfields1;
-	std::vector<int> outfields2;
+	std::vector<int> outfields1; bool outfields1_empty = false;
+	std::vector<int> outfields2; bool outfields2_empty = false;
 	
 	char delim = 0;
 	char comment = 0;
@@ -310,28 +344,32 @@ int main(int argc, char** args) {
 			{
 				std::vector<int> tmp;
 				bool valid = true;
+				bool empty = true;
 				int max = 0;
 				// it is valid to give zero output columns from one of the files
 				// (e.g. to filter the other file)
 				// this case it might be necessary to give an empty string
 				// as the argument (i.e. -o1 "")
-				if( !(args[i+1][0] == 0 || args[i+1][0] == '-') ) {
+				if( !(args[i+1] == 0 || args[i+1][0] == 0 || args[i+1][0] == '-') ) {
 					line_parser lp(line_parser_params().set_delim(','),args[i+1]);
 					int x;
 					while(lp.read(x)) { tmp.push_back(x); if(x > max) max = x; if(x < 1) { valid = false; break; } }
 					if(lp.get_last_error() != T_EOL || tmp.empty()) valid = false;
+					empty = false;
 				}
-				if(!valid) { std::cerr<<"Invalid parameter: "<<args[i]<<" "<<args[i+1]<<"\n  use hashjoin -h for help\n"; return 1; }
+				if(!valid) { std::cerr<<"Invalid parameter: "<<args[i]<<" "<<args[i+1]<<"\n  use numjoin -h for help\n"; return 1; }
 				if(args[i][2] == '1') {
 					outfields1 = std::move(tmp);
 					if(max > req_fields1) req_fields1 = max;
+					outfields1_empty = empty;
 				}
 				if(args[i][2] == '2') {
 					outfields2 = std::move(tmp);
 					if(max > req_fields2) req_fields2 = max;
+					outfields2_empty = empty;
 				}
+				if(!(args[i+1] == 0 || args[i+1][0] == '-')) i++;
 			}
-			i++;
 			break;
 		case 'H':
 			header = true;
@@ -423,8 +461,8 @@ int main(int argc, char** args) {
 			file2header.push_back(std::move(tmp));
 		}
 		bool firstout = true;
-		WriteFields(sw,file1header,outfields1,firstout,out_sep);
-		WriteFields(sw,file2header,outfields2,firstout,out_sep);
+		if(!outfields1_empty) WriteFields(sw,file1header,outfields1,firstout,out_sep);
+		if(!outfields2_empty) WriteFields(sw,file2header,outfields2,firstout,out_sep);
 	}
 	
 	uint64_t out_lines = 0;
@@ -457,8 +495,8 @@ int main(int argc, char** args) {
 					bool firstout = true;
 					
 					// write out fields from the first file
-					WriteFields(sw,line1.second,outfields1,firstout,out_sep);
-					WriteFields(sw,line2,outfields2,firstout,out_sep);
+					if(!outfields1_empty) WriteFields(sw,line1.second,outfields1,firstout,out_sep);
+					if(!outfields2_empty) WriteFields(sw,line2,outfields2,firstout,out_sep);
 					sw<<'\n';
 					out_lines++;
 				}
@@ -471,7 +509,7 @@ int main(int argc, char** args) {
 			bool firstout = true;
 			// note: we write empty fields for file 1
 			if(!outfields1.empty()) WriteFields(sw,std::vector<string_view_custom>(),outfields1,firstout,out_sep);
-			WriteFields(sw,line2,outfields2,firstout,out_sep);
+			if(!outfields2_empty) WriteFields(sw,line2,outfields2,firstout,out_sep);
 			sw<<'\n';
 			out_lines++;
 			unmatched++;
@@ -484,7 +522,7 @@ int main(int argc, char** args) {
 			for(const auto& line1 : x.second.lines) {
 				// still print unpaired lines from file 1
 				bool firstout = true;
-				WriteFields(sw,line1.second,outfields1,firstout,out_sep);
+				if(!outfields1_empty) WriteFields(sw,line1.second,outfields1,firstout,out_sep);
 				// note: we write empty fields for file 2
 				if(!outfields2.empty()) WriteFields(sw,std::vector<string_view_custom>(),outfields2,firstout,out_sep);
 				sw<<'\n';

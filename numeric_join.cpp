@@ -95,8 +95,8 @@ Important: FILE1 and FILE2 must be sorted on the join fields.
  * 
  * returns true on success, false on errors
  */
-static bool SplitLine(line_parser& sr, std::vector<string_view_custom>& res) {
-	for(size_t i=0;i<res.size();i++) if(!sr.read(res[i])) return false;
+static bool SplitLine(line_parser& sr, std::vector<std::pair<size_t,size_t> >& res) {
+	for(size_t i=0;i<res.size();i++) if(!sr.read_string_view_pair(res[i])) return false;
 	return true;
 }
 
@@ -110,16 +110,19 @@ static bool GetID(line_parser& sr, int field, int64_t& id) {
 
 struct parsed_line {
 	line_parser parser;
-	std::vector<string_view_custom> fields;
+	std::vector<std::pair<size_t,size_t> > fields;
 	parsed_line() = delete;
+	parsed_line(const parsed_line& pl) = delete;
+	parsed_line(parsed_line&& pl) = default;
 	parsed_line(line_parser_params par, const std::string& line, size_t req_fields):parser(par,line) {
 		fields.reserve(req_fields);
 		while(true) {
-			string_view_custom v;
-			if(!parser.read_string_view_custom(v)) break;
+			std::pair<size_t,size_t> v;
+			if(!parser.read_string_view_pair(v)) break;
 			fields.push_back(v);
 		}
 	}
+	const std::string& get_line_str() const { return parser.get_line_str(); }
 };
 
 
@@ -181,19 +184,23 @@ static bool ReadNext(read_table2& sr, std::vector<parsed_line>& lines, int64_t& 
 	return true;
 }
 
-static void WriteFields(std::ostream& sw, const std::vector<string_view_custom>& line,
-		const std::vector<int>& fields, bool& firstout, char out_sep) {
+static inline void OutputField(std::ostream& sw, const std::string& buf, const std::pair<size_t,size_t>& pos) {
+	for(size_t i=0;i<pos.second;i++) sw<<buf[pos.first+i];
+}
+
+static void WriteFields(std::ostream& sw, const std::vector<std::pair<size_t,size_t> >& line,
+		const std::string& buf, const std::vector<int>& fields, bool& firstout, char out_sep) {
 	if(!fields.empty()) for(int f : fields) {
-		if(firstout) { if(!line.empty()) sw<<line[f-1]; }
+		if(firstout) { if(!line.empty()) OutputField(sw,buf,line[f-1]); }
 		else {
-			if(!line.empty()) sw<<out_sep<<line[f-1];
+			if(!line.empty()) { sw<<out_sep; OutputField(sw,buf,line[f-1]); }
 			else sw<<out_sep;
 		}
 		firstout = false;
 	}
-	else for(auto& s : line) {
-		if(firstout) sw<<s;
-		else sw<<out_sep<<s;
+	else for(const auto& s : line) {
+		if(firstout) OutputField(sw,buf,s);
+		else { sw<<out_sep; OutputField(sw,buf,s); }
 		firstout = false;
 	}
 }
@@ -329,8 +336,8 @@ int main(int argc, char** args) {
 	char out_sep = '\t';
 	if(delim) out_sep = delim;
 	
-	std::vector<string_view_custom> line1_fields(req_fields1);
-	std::vector<string_view_custom> line2_fields(req_fields2);
+	std::vector<std::pair<size_t,size_t> > line1_fields(req_fields1);
+	std::vector<std::pair<size_t,size_t> > line2_fields(req_fields2);
 	
 	if(header) {
 		// read and write output header
@@ -347,8 +354,8 @@ int main(int argc, char** args) {
 		
 			
 		bool firstout = true;
-		if(!outfields1_empty) WriteFields(sw,line1_fields,outfields1,firstout,out_sep);
-		if(!outfields2_empty) WriteFields(sw,line2_fields,outfields2,firstout,out_sep);
+		if(!outfields1_empty) WriteFields(sw,line1_fields,s1.get_line_str(),outfields1,firstout,out_sep);
+		if(!outfields2_empty) WriteFields(sw,line2_fields,s2.get_line_str(),outfields2,firstout,out_sep);
 		
 	}
 	
@@ -383,8 +390,8 @@ int main(int argc, char** args) {
 				for(size_t k=0;k<lines2.size();k++) {
 					// write out fields from the first file
 					bool firstout = true;
-					if(!outfields1_empty) WriteFields(sw,lines1[j].fields,outfields1,firstout,out_sep);
-					if(!outfields2_empty) WriteFields(sw,lines2[k].fields,outfields2,firstout,out_sep);
+					if(!outfields1_empty) WriteFields(sw,lines1[j].fields,lines1[j].get_line_str(),outfields1,firstout,out_sep);
+					if(!outfields2_empty) WriteFields(sw,lines2[k].fields,lines2[k].get_line_str(),outfields2,firstout,out_sep);
 					sw<<'\n';
 					out_lines++;
 				}
@@ -428,9 +435,9 @@ int main(int argc, char** args) {
 			if(unpaired == 1) for(size_t j=0;j<lines1.size();j++) {
 				// still print unpaired lines from file 1
 				bool firstout = true;
-				if(!outfields1_empty) WriteFields(sw,lines1[j].fields,outfields1,firstout,out_sep);
+				if(!outfields1_empty) WriteFields(sw,lines1[j].fields,lines1[j].get_line_str(),outfields1,firstout,out_sep);
 				// note: we write empty fields for file 2
-				if(!outfields2.empty()) WriteFields(sw,std::vector<string_view_custom>(),outfields2,firstout,out_sep);
+				if(!outfields2.empty()) WriteFields(sw,std::vector<std::pair<size_t,size_t> >(),std::string(),outfields2,firstout,out_sep);
 				sw<<'\n';
 				out_lines++;
 				unmatched++;
@@ -457,8 +464,8 @@ int main(int argc, char** args) {
 				// still print unpaired lines from file 2
 				bool firstout = true;
 				// note: we write empty fields for file 1
-				if(!outfields1.empty()) WriteFields(sw,std::vector<string_view_custom>(),outfields1,firstout,out_sep);
-				if(!outfields2_empty) WriteFields(sw,lines2[j].fields,outfields2,firstout,out_sep);
+				if(!outfields1.empty()) WriteFields(sw,std::vector<std::pair<size_t,size_t> >(),std::string(),outfields1,firstout,out_sep);
+				if(!outfields2_empty) WriteFields(sw,lines2[j].fields,lines2[j].get_line_str(),outfields2,firstout,out_sep);
 				sw<<'\n';
 				out_lines++;
 				unmatched++;
