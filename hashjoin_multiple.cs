@@ -388,7 +388,7 @@ Example usage:
 				if(matched_all) {
 					for(int i=0;i<line2.Length;i++) {
 						sw.Write(line2[i]);
-						if(matched[i] != null) {
+						if(i < matched.Length && matched[i] != null) {
 							int key2 = matched[i].Item1;
 							string[] line1 = matched[i].Item2;
 							for(int j=0;j<line1.Length;j++) if(j+1 != key2) {
