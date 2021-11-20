@@ -336,6 +336,7 @@ generated on-the-fly and the size can be indefinite or very large.
 					bool firstout = true;
 					WriteFields(sw,h1,outfields1,ref firstout,out_sep);
 					WriteFields(sw,h2,outfields2,ref firstout,out_sep);
+					sw.Write('\n');
 				}
 			}
 			
